@@ -299,6 +299,39 @@ $$;
 -- ============================================================================
 -- SEED DATA INICIAL
 -- ============================================================================
+INSERT INTO public.schools (name, slug, css_class, primary_hex, secondary_hex) VALUES
+  ('Informática y Telecomunicaciones', 'informatica', 'E-IyT-New', '#307FE2', '#8BB8E8'),
+  ('Ingeniería y Recursos Naturales', 'ingenieria', 'E-Ing-New', '#43B02A', '#A1D884'),
+  ('Diseño', 'diseno', 'E-Dis-New', '#C4D600', '#DBE442'),
+  ('Administración y Negocios', 'administracion', 'E-AyN-New', '#AC4FC6', '#C98BDB'),
+  ('Comunicación', 'comunicacion', 'E-Com-New', '#D50032', '#DF4661'),
+  ('Construcción', 'construccion', 'E-Cons-New', '#E87722', '#ECA154'),
+  ('Salud y Bienestar', 'salud', 'E-Sal-New', '#5BC2E7', '#99D6EA'),
+  ('Gastronomía', 'gastronomia', 'E-Gas', '#FF585D', '#FF808B'),
+  ('Turismo y Hospitalidad', 'turismo', 'E-Tur-New', '#00A499', '#2AD2C9')
+ON CONFLICT (slug) DO NOTHING;
+
+INSERT INTO public.campuses (name, slug, region) VALUES
+  ('Sede San Andrés de Concepción', 'concepcion', 'Biobío'),
+  ('Sede Antonio Varas', 'antonio-varas', 'Metropolitana'),
+  ('Sede San Joaquín', 'san-joaquin', 'Metropolitana'),
+  ('Sede Plaza Oeste', 'plaza-oeste', 'Metropolitana'),
+  ('Sede Maipú', 'maipu', 'Metropolitana'),
+  ('Sede Puente Alto', 'puente-alto', 'Metropolitana'),
+  ('Sede Plaza Norte', 'plaza-norte', 'Metropolitana'),
+  ('Sede Plaza Vespucio', 'plaza-vespucio', 'Metropolitana'),
+  ('Sede Alameda', 'alameda', 'Metropolitana'),
+  ('Sede Padre Alonso de Ovalle', 'alonso-de-ovalle', 'Metropolitana'),
+  ('Sede San Bernardo', 'san-bernardo', 'Metropolitana'),
+  ('Sede Melipilla', 'melipilla', 'Metropolitana'),
+  ('Sede Viña del Mar', 'vina-del-mar', 'Valparaíso'),
+  ('Sede Valparaíso', 'valparaiso', 'Valparaíso'),
+  ('Sede Villarrica', 'villarrica', 'La Araucanía'),
+  ('Sede Puerto Montt', 'puerto-montt', 'Los Lagos'),
+  ('Sede Nacimiento', 'nacimiento', 'Biobío'),
+  ('Sede Arauco', 'arauco', 'Biobío')
+ON CONFLICT (slug) DO NOTHING;
+
 INSERT INTO public.partner_invitations (code, company_name, created_by, expires_at) VALUES
   ('AWS-INNOVA-2026', 'Amazon Web Services (AWS)', 'carlos-vega-docente', now() + interval '1 year'),
   ('CITT-PARTNER-2026', 'Red de Empresas Aliadas CITT', 'carlos-vega-docente', now() + interval '1 year'),
