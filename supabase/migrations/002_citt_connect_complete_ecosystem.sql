@@ -197,6 +197,34 @@ CREATE TABLE IF NOT EXISTS public.partner_invitations (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- 9. SOLICITUDES BILATERALES (+CONNECT)
+CREATE TABLE IF NOT EXISTS public.connection_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  requester_id TEXT NOT NULL,
+  receiver_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending', -- 'pending' | 'accepted'
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(requester_id, receiver_id)
+);
+
+-- 10. HARDWARE NFC TAGS & PINS 3D
+CREATE TABLE IF NOT EXISTS public.nfc_tags (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tag_uid TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL DEFAULT 'unassigned', -- 'unassigned' | 'active' | 'suspended'
+  assigned_username TEXT,
+  batch_label TEXT,
+  last_scanned_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Índices de alto rendimiento
+CREATE INDEX IF NOT EXISTS idx_nfc_tags_uid ON public.nfc_tags(tag_uid);
+CREATE INDEX IF NOT EXISTS idx_conn_req_lookup ON public.connection_requests(requester_id, receiver_id);
+CREATE INDEX IF NOT EXISTS idx_projects_slug ON public.projects(slug);
+CREATE INDEX IF NOT EXISTS idx_profiles_username ON public.profiles(username);
+
 -- ============================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
 -- ============================================================================
@@ -208,6 +236,8 @@ ALTER TABLE public.project_collaborators ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.project_applications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.partner_invitations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.connection_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.nfc_tags ENABLE ROW LEVEL SECURITY;
 
 -- Lectura pública para visualización en toda la red
 CREATE POLICY "Lectura pública de sedes" ON public.campuses FOR SELECT USING (true);
@@ -216,6 +246,7 @@ CREATE POLICY "Lectura pública de perfiles" ON public.profiles FOR SELECT USING
 CREATE POLICY "Lectura pública de proyectos" ON public.projects FOR SELECT USING (true);
 CREATE POLICY "Lectura pública de colaboradores" ON public.project_collaborators FOR SELECT USING (true);
 CREATE POLICY "Lectura pública del muro" ON public.posts FOR SELECT USING (true);
+CREATE POLICY "Lectura pública de tags nfc" ON public.nfc_tags FOR SELECT USING (true);
 
 -- Escritura controlada por usuario
 CREATE POLICY "Usuarios pueden actualizar su propio perfil" ON public.profiles
@@ -233,6 +264,38 @@ CREATE POLICY "Postulaciones visibles para el postulante y el líder" ON public.
 CREATE POLICY "Cualquier usuario autenticado puede postular a proyectos" ON public.project_applications
   FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
+CREATE POLICY "Usuarios autenticados pueden gestionar sus solicitudes de conexión" ON public.connection_requests
+  FOR ALL USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Usuarios autenticados pueden vincular tags nfc" ON public.nfc_tags
+  FOR UPDATE USING (auth.role() = 'authenticated');
+
+-- ============================================================================
+-- RPC: RESOLVER PIN NFC Y REGISTRAR ESCANEO
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.resolve_nfc_tag(p_tag_uid TEXT)
+RETURNS TABLE (
+  status TEXT,
+  username TEXT,
+  batch_label TEXT
+) LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  -- Actualizar última lectura
+  UPDATE public.nfc_tags
+  SET last_scanned_at = now()
+  WHERE tag_uid = lower(trim(p_tag_uid));
+
+  RETURN QUERY
+  SELECT
+    t.status,
+    t.assigned_username,
+    t.batch_label
+  FROM public.nfc_tags t
+  WHERE t.tag_uid = lower(trim(p_tag_uid))
+  LIMIT 1;
+END;
+$$;
+
 -- ============================================================================
 -- SEED DATA INICIAL
 -- ============================================================================
@@ -241,3 +304,16 @@ INSERT INTO public.partner_invitations (code, company_name, created_by, expires_
   ('CITT-PARTNER-2026', 'Red de Empresas Aliadas CITT', 'carlos-vega-docente', now() + interval '1 year'),
   ('SANTANDER-HUB-2026', 'Banco Santander Innovación', 'carlos-vega-docente', now() + interval '1 year')
 ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO public.nfc_tags (tag_uid, status, assigned_username, batch_label) VALUES
+  ('citt-pin-001', 'active', 'vicente.vasquez', 'Lote 3D Maipú 2026-A'),
+  ('pin-dev-01', 'active', 'vicente.vasquez', 'Lote 3D Maipú 2026-A'),
+  ('citt-pin-002', 'active', 'valentina.araya', 'Lote 3D San Joaquín 2026-A'),
+  ('pin-val-02', 'active', 'valentina.araya', 'Lote 3D San Joaquín 2026-A'),
+  ('citt-pin-003', 'active', 'diego.retamal', 'Lote 3D Maipú 2026-A'),
+  ('citt-pin-004', 'active', 'camila.navarro', 'Lote 3D Viña del Mar 2026-A'),
+  ('citt-pin-005', 'active', 'matias.morales', 'Lote 3D Plaza Vespucio 2026-A'),
+  ('citt-new-001', 'unassigned', NULL, 'Lote Virgen Impresión 3D CITT'),
+  ('citt-new-002', 'unassigned', NULL, 'Lote Virgen Impresión 3D CITT'),
+  ('citt-unassigned', 'unassigned', NULL, 'Lote Virgen Impresión 3D CITT')
+ON CONFLICT (tag_uid) DO NOTHING;
