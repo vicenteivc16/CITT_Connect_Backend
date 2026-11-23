@@ -34,7 +34,7 @@ CREATE POLICY "Usuarios autenticados pueden enviar solicitudes de conexión"
       auth.uid()::text = requester_id OR
       EXISTS (
         SELECT 1 FROM public.profiles 
-        WHERE id = auth.uid()::text AND (id = requester_id OR username = requester_id)
+        WHERE id = auth.uid() AND (id::text = requester_id OR username = requester_id)
       )
     )
   );
@@ -47,7 +47,7 @@ CREATE POLICY "Destinatario o emisor pueden actualizar estado de conexión"
       auth.uid()::text = requester_id OR
       EXISTS (
         SELECT 1 FROM public.profiles 
-        WHERE id = auth.uid()::text AND (id = receiver_id OR username = receiver_id OR id = requester_id OR username = requester_id)
+        WHERE id = auth.uid() AND (id::text = receiver_id OR username = receiver_id OR id::text = requester_id OR username = requester_id)
       )
     )
   );
@@ -60,7 +60,7 @@ CREATE POLICY "Participantes pueden cancelar o eliminar solicitud"
       auth.uid()::text = receiver_id OR
       EXISTS (
         SELECT 1 FROM public.profiles 
-        WHERE id = auth.uid()::text AND (role = 'dev')
+        WHERE id = auth.uid() AND (role = 'dev')
       )
     )
   );
@@ -96,12 +96,12 @@ CREATE POLICY "Postulaciones visibles para el postulante y líderes"
     auth.uid() IS NOT NULL AND (
       EXISTS (
         SELECT 1 FROM public.profiles 
-        WHERE id = auth.uid()::text AND (username = applicant_username OR role IN ('dev', 'lider_citt', 'personal_duoc'))
+        WHERE id = auth.uid() AND (username = applicant_username OR role IN ('dev', 'lider_citt', 'personal_duoc'))
       ) OR
       EXISTS (
         SELECT 1 FROM public.projects 
-        WHERE id = project_id AND lead_username = (
-          SELECT username FROM public.profiles WHERE id = auth.uid()::text
+        WHERE (id::text = project_id OR slug = project_id) AND lead_username = (
+          SELECT username FROM public.profiles WHERE id = auth.uid()
         )
       )
     )
@@ -113,7 +113,7 @@ CREATE POLICY "Usuarios autenticados pueden postular a proyectos"
     auth.uid() IS NOT NULL AND (
       EXISTS (
         SELECT 1 FROM public.profiles 
-        WHERE id = auth.uid()::text AND username = applicant_username
+        WHERE id = auth.uid() AND username = applicant_username
       )
     )
   );
@@ -124,13 +124,13 @@ CREATE POLICY "Líder del proyecto o admin pueden actualizar estado de postulaci
     auth.uid() IS NOT NULL AND (
       EXISTS (
         SELECT 1 FROM public.projects 
-        WHERE id = project_id AND lead_username = (
-          SELECT username FROM public.profiles WHERE id = auth.uid()::text
+        WHERE (id::text = project_id OR slug = project_id) AND lead_username = (
+          SELECT username FROM public.profiles WHERE id = auth.uid()
         )
       ) OR
       EXISTS (
         SELECT 1 FROM public.profiles 
-        WHERE id = auth.uid()::text AND role = 'dev'
+        WHERE id = auth.uid() AND role = 'dev'
       )
     )
   );
@@ -160,7 +160,7 @@ BEGIN
     v_enrolled, 
     v_waiting
   FROM public.activities
-  WHERE id = p_activity_id
+  WHERE id::text = p_activity_id OR slug = p_activity_id
   FOR UPDATE;
 
   IF NOT FOUND THEN
@@ -178,7 +178,7 @@ BEGIN
     SET 
       enrolled_usernames = array_append(v_enrolled, p_username),
       updated_at = now()
-    WHERE id = p_activity_id;
+    WHERE id::text = p_activity_id OR slug = p_activity_id;
 
     RETURN jsonb_build_object(
       'success', true, 
@@ -197,7 +197,7 @@ BEGIN
     SET 
       waiting_list_usernames = array_append(v_waiting, p_username),
       updated_at = now()
-    WHERE id = p_activity_id;
+    WHERE id::text = p_activity_id OR slug = p_activity_id;
 
     RETURN jsonb_build_object(
       'success', true, 
